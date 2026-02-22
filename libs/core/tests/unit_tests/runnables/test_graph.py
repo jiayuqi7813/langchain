@@ -575,7 +575,13 @@ def test_mermaid_base_url_default() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value="https://mermaid.ink",
+        ),
+    ):
         # Call the function with base_url=None (default)
         _render_mermaid_using_api(
             "graph TD;\n    A --> B;",
@@ -596,7 +602,13 @@ def test_mermaid_base_url_custom() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value=custom_url,
+        ),
+    ):
         # Call the function with custom base_url.
         _render_mermaid_using_api(
             "graph TD;\n    A --> B;",
@@ -617,7 +629,13 @@ def test_draw_mermaid_png_function_base_url() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value=custom_url,
+        ),
+    ):
         # Call draw_mermaid_png with custom base_url
         draw_mermaid_png(
             "graph TD;\n    A --> B;",
@@ -639,7 +657,13 @@ def test_graph_draw_mermaid_png_base_url() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value=custom_url,
+        ),
+    ):
         # Create a simple graph
         graph = Graph()
         start_node = graph.add_node(BaseModel, id="start")
@@ -666,7 +690,13 @@ def test_mermaid_bgcolor_url_encoding() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value="https://mermaid.ink",
+        ),
+    ):
         _render_mermaid_using_api(
             "graph TD;\n    A --> B;",
             background_color="white",
@@ -686,7 +716,13 @@ def test_mermaid_bgcolor_hex_not_encoded() -> None:
     mock_response.status_code = 200
     mock_response.content = b"fake image data"
 
-    with patch("requests.get", return_value=mock_response) as mock_get:
+    with (
+        patch("requests.get", return_value=mock_response) as mock_get,
+        patch(
+            "langchain_core.runnables.graph_mermaid.validate_safe_url",
+            return_value="https://mermaid.ink",
+        ),
+    ):
         _render_mermaid_using_api(
             "graph TD;\n    A --> B;",
             background_color="#ffffff",
@@ -696,6 +732,29 @@ def test_mermaid_bgcolor_hex_not_encoded() -> None:
         url = mock_get.call_args[0][0]
         # Hex colors should be URL-encoded but not prefixed with '!'
         assert "%23ffffff" in url  # '#' encoded as '%23'
+
+
+def test_mermaid_ssrf_blocked() -> None:
+    """Test that SSRF attacks via base_url are blocked."""
+    import pytest
+
+    with pytest.raises(ValueError, match="Localhost"):
+        _render_mermaid_using_api(
+            "graph TD;\n    A --> B;",
+            base_url="http://localhost:8080",
+        )
+
+    with pytest.raises(ValueError, match="private IP"):
+        _render_mermaid_using_api(
+            "graph TD;\n    A --> B;",
+            base_url="http://192.168.1.1",
+        )
+
+    with pytest.raises(ValueError, match="metadata"):
+        _render_mermaid_using_api(
+            "graph TD;\n    A --> B;",
+            base_url="http://169.254.169.254",
+        )
 
 
 def test_graph_mermaid_special_chars(snapshot: SnapshotAssertion) -> None:

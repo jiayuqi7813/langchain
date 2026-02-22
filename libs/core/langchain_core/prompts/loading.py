@@ -41,6 +41,23 @@ def load_prompt_from_config(config: dict) -> BasePromptTemplate:
     return prompt_loader(config)
 
 
+def _validate_path(file_path: Path) -> None:
+    """Validate that a file path does not contain path traversal sequences.
+
+    Args:
+        file_path: The path to validate.
+
+    Raises:
+        ValueError: If the path contains path traversal sequences.
+    """
+    if ".." in file_path.parts:
+        msg = (
+            f"Path '{file_path}' contains directory traversal sequences and "
+            f"is not allowed."
+        )
+        raise ValueError(msg)
+
+
 def _load_template(var_name: str, config: dict) -> dict:
     """Load template from the path if applicable."""
     # Check if template_path exists in config.
@@ -51,6 +68,8 @@ def _load_template(var_name: str, config: dict) -> dict:
             raise ValueError(msg)
         # Pop the template path from the config.
         template_path = Path(config.pop(f"{var_name}_path"))
+        # Validate path against directory traversal attacks.
+        _validate_path(template_path)
         # Load the template.
         if template_path.suffix == ".txt":
             template = template_path.read_text(encoding="utf-8")
@@ -67,6 +86,8 @@ def _load_examples(config: dict) -> dict:
         pass
     elif isinstance(config["examples"], str):
         path = Path(config["examples"])
+        # Validate path against directory traversal attacks.
+        _validate_path(path)
         with path.open(encoding="utf-8") as f:
             if path.suffix == ".json":
                 examples = json.load(f)
@@ -105,7 +126,10 @@ def _load_few_shot_prompt(config: dict) -> FewShotPromptTemplate:
                 "be specified."
             )
             raise ValueError(msg)
-        config["example_prompt"] = load_prompt(config.pop("example_prompt_path"))
+        example_prompt_path = config.pop("example_prompt_path")
+        # Validate path against directory traversal attacks.
+        _validate_path(Path(example_prompt_path))
+        config["example_prompt"] = load_prompt(example_prompt_path)
     else:
         config["example_prompt"] = load_prompt_from_config(config["example_prompt"])
     # Load the examples.

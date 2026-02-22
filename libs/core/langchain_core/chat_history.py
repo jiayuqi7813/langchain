@@ -51,6 +51,7 @@ class BaseChatMessageHistory(ABC):
         ```python
         import json
         import os
+        from pathlib import Path
         from langchain_core.messages import messages_from_dict, message_to_dict
 
 
@@ -58,11 +59,25 @@ class BaseChatMessageHistory(ABC):
             storage_path: str
             session_id: str
 
+            def _get_safe_file_path(self) -> str:
+                # Sanitize session_id to prevent path traversal attacks.
+                # os.path.basename strips directory components like "../"
+                safe_id = os.path.basename(self.session_id)
+                if not safe_id:
+                    raise ValueError("Invalid session_id")
+                file_path = os.path.join(self.storage_path, safe_id)
+                # Verify the resolved path stays within storage_path
+                resolved = str(Path(file_path).resolve())
+                storage_resolved = str(Path(self.storage_path).resolve())
+                if not resolved.startswith(storage_resolved + os.sep):
+                    raise ValueError("session_id escapes storage directory")
+                return file_path
+
             @property
             def messages(self) -> list[BaseMessage]:
                 try:
                     with open(
-                        os.path.join(self.storage_path, self.session_id),
+                        self._get_safe_file_path(),
                         "r",
                         encoding="utf-8",
                     ) as f:
@@ -76,13 +91,13 @@ class BaseChatMessageHistory(ABC):
                 all_messages.extend(messages)  # Add new messages
 
                 serialized = [message_to_dict(message) for message in all_messages]
-                file_path = os.path.join(self.storage_path, self.session_id)
+                file_path = self._get_safe_file_path()
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(serialized, f)
 
             def clear(self) -> None:
-                file_path = os.path.join(self.storage_path, self.session_id)
+                file_path = self._get_safe_file_path()
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump([], f)
