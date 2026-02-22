@@ -177,3 +177,60 @@ def test_loading_few_shot_prompt_example_prompt() -> None:
             suffix="Input: {adjective}\nOutput:",
         )
         assert prompt == expected_prompt
+
+
+def test_path_traversal_in_template_path() -> None:
+    """Test that path traversal in template_path is blocked."""
+    from langchain_core.prompts.loading import _load_template
+
+    config = {"template_path": "../../etc/passwd.txt"}
+    with pytest.raises(ValueError, match="directory traversal"):
+        _load_template("template", config)
+
+
+def test_path_traversal_in_examples_path() -> None:
+    """Test that path traversal in examples path is blocked."""
+    from langchain_core.prompts.loading import _load_examples
+
+    config = {"examples": "../../../etc/secret.json"}
+    with pytest.raises(ValueError, match="directory traversal"):
+        _load_examples(config)
+
+
+def test_path_traversal_in_example_prompt_path() -> None:
+    """Test that path traversal in example_prompt_path is blocked."""
+    from langchain_core.prompts.loading import _load_few_shot_prompt
+
+    config = {
+        "input_variables": ["adjective"],
+        "prefix": "prefix",
+        "suffix": "suffix",
+        "example_prompt_path": "../../etc/evil.json",
+        "examples": [],
+    }
+    with pytest.raises(ValueError, match="directory traversal"):
+        _load_few_shot_prompt(config)
+
+
+def test_normal_relative_path_allowed() -> None:
+    """Test that normal relative paths without traversal still work."""
+    from langchain_core.prompts.loading import _validate_path
+
+    # Normal relative path (no ..) — should not raise
+    _validate_path(Path("templates/my_template.txt"))
+    # Absolute path (no ..) — should not raise
+    _validate_path(Path("/absolute/path/template.txt"))
+    # Current directory — should not raise
+    _validate_path(Path("template.txt"))
+
+
+def test_path_traversal_various_patterns() -> None:
+    """Test that various path traversal patterns are blocked."""
+    from langchain_core.prompts.loading import _validate_path
+
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("foo/../../bar.txt"))
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("../secret.txt"))
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("a/b/../../../etc/passwd.txt"))

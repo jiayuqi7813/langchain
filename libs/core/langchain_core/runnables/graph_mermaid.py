@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import yaml
 
+from langchain_core._security._ssrf_protection import validate_safe_url
 from langchain_core.runnables.graph import (
     CurveStyle,
     MermaidDrawMethod,
@@ -416,6 +417,9 @@ def _render_mermaid_using_api(
     """Renders Mermaid graph using the Mermaid.INK API."""
     # Defaults to using the public mermaid.ink server.
     base_url = base_url if base_url is not None else "https://mermaid.ink"
+
+    # Validate base_url against SSRF attacks
+    validate_safe_url(base_url)
 
     if not _HAS_REQUESTS:
         msg = (
