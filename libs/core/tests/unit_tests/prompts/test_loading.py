@@ -216,9 +216,21 @@ def test_normal_relative_path_allowed() -> None:
     """Test that normal relative paths without traversal still work."""
     from langchain_core.prompts.loading import _validate_path
 
-    # Normal relative path (no ..)
+    # Normal relative path (no ..) — should not raise
     _validate_path(Path("templates/my_template.txt"))
-    # Absolute path (no ..)
+    # Absolute path (no ..) — should not raise
     _validate_path(Path("/absolute/path/template.txt"))
-    # Current directory
+    # Current directory — should not raise
     _validate_path(Path("template.txt"))
+
+
+def test_path_traversal_various_patterns() -> None:
+    """Test that various path traversal patterns are blocked."""
+    from langchain_core.prompts.loading import _validate_path
+
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("foo/../../bar.txt"))
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("../secret.txt"))
+    with pytest.raises(ValueError, match="directory traversal"):
+        _validate_path(Path("a/b/../../../etc/passwd.txt"))

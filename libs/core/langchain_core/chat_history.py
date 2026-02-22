@@ -67,9 +67,9 @@ class BaseChatMessageHistory(ABC):
                     raise ValueError("Invalid session_id")
                 file_path = os.path.join(self.storage_path, safe_id)
                 # Verify the resolved path stays within storage_path
-                resolved = str(Path(file_path).resolve())
-                storage_resolved = str(Path(self.storage_path).resolve())
-                if not resolved.startswith(storage_resolved + os.sep):
+                resolved = Path(file_path).resolve()
+                storage_resolved = Path(self.storage_path).resolve()
+                if not resolved.is_relative_to(storage_resolved):
                     raise ValueError("session_id escapes storage directory")
                 return file_path
 
